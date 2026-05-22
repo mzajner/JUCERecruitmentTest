@@ -36,7 +36,7 @@ The executable will be in different places depending on your compiler/OS combo.
 
 Windows: `build\src\JUCERecruitmentTest_artefacts\Debug\JUCERecruitmentTest.exe`
 
-MacOS: ``
+MacOS: `build/src/JUCERecruitmentTest_artefacts/JUCERecruitmentTest.app`
 
 ## Run the server emulator script
 
