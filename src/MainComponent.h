@@ -19,13 +19,16 @@ private:
     
     void timerCallback() override;
     void sendParameterValue (int index, int value);
-    
+
     std::array<juce::Slider, 4> paramSliders;
     std::array<juce::Label, 4> paramLabels;
     juce::Label statusLabel;
 
     std::unique_ptr<FilmstripKnobLookAndFeel> knobLookAndFeel;
     std::atomic<bool> isPolling{ false };
+    std::arrat<bool, 4> isDraggingSlider {};
+    std::array<bool, 4> isWritePending {};
+    std::array<int, 4> parameterRevision {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

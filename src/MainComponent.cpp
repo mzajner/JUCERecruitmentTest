@@ -66,9 +66,17 @@ MainComponent::MainComponent()
         slider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 20);
         slider.setLookAndFeel (knobLookAndFeel.get());
+        slider.onDragStart = [this, i]
+        {
+            isDraggingSlider[(size_t) i] = true;
+            statusLabel.setText ("Dragging Param " + juce::String (i + 1) + "...", juce::NotificationType::dontSendNotification);
+        };
         slider.onDragEnd = [this, i]
         {
             const auto value = static_cast<int> (paramSliders[(size_t) i].getValue());
+
+            isDraggingSlider[static_cast<size_t> (i)] = false;
+            isWritePending[(size_t) i] = false;
             sendParameterValue (i, value);
         };
         addAndMakeVisible (slider);
