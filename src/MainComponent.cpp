@@ -66,8 +66,17 @@ MainComponent::MainComponent()
         slider.setSliderStyle (juce::Slider::SliderStyle::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 20);
         slider.setLookAndFeel (knobLookAndFeel.get());
+        slider.onDragEnd = [this, i]
+        {
+            const auto value = static_cast<int> (paramSliders[(size_t) i].getValue());
+            sendParameterValue (i, value);
+        };
         addAndMakeVisible (slider);
     }
+
+    statusLabel.setText ("Connecting...", juce::dontSendNotification);
+    statusLabel.setJustificationType (juce::Justification::centred);
+    addAndMakeVisible (statusLabel);
 }
 
 MainComponent::~MainComponent()
@@ -103,32 +112,96 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
-    for (int i = 0; i < static_cast<int> (paramSliders.size()); ++i)
-    {
-        auto url = juce::URL ("http://127.0.0.1:8000/parameters/" + juce::String (i));
+    if (isPolling.exchange (true))
+        return;
 
-        auto inputStream = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                                                .withConnectionTimeoutMs (1500));
+    // Launch a new thread to do the polling so that we don't block the message thread while waiting for the server response.
+    juce::Thread::launch ([this]
+    {
+        std::array<int, 4> values {};
+        juce::String errorMessage;
+
+        for (int i = 0; i < static_cast<int> (values.size()); ++i)
+        {
+            auto url = juce::URL ("http://127.0.0.1:8000/parameters/" + juce::String (i));
+
+            auto inputStream = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                                    .withConnectionTimeoutMs (1500));
+            
+            if (inputStream == nullptr)
+            {
+                errorMessage= "Server unavailable";
+                break;
+            }
+
+            auto response = inputStream->readEntireStreamAsString();
+            auto parsed = juce::JSON::parse (response);
+
+            if (! parsed.isObject())
+            {
+                errorMessage = "Invalid response";
+                return;
+            }
+
+            auto* object = parsed.getDynamicObject();
+            values[static_cast<size_t> (i)] = static_cast<int> (object->getProperty ("value"));
+        }
+
+        juce::MessageManager::callAsync ([this, values, errorMessage]
+        {
+            if (errorMessage.isNotEmpty())
+            {
+                statusLabel.setText (errorMessage, juce::NotificationType::dontSendNotification);
+                return;
+            }
+            else
+            {
+                for (int i = 0; i < static_cast<int> (paramSliders.size()); ++i)
+                    paramSliders[static_cast<size_t> (i)].setValue (values[static_cast<size_t> (i)], juce::NotificationType::dontSendNotification);
+
+                        statusLabel.setText ("Connected", juce::NotificationType::dontSendNotification);
+
+            }
+            
+            isPolling = false;
+        });
+    });
+}
+
+void MainComponent::sendParameterValue (int index, int value)
+{
+    juce::Thread::launch ([this, index, value]
+    {
+        auto body = juce::String ("{\"value\": ") + juce::String (value) + "}";
+        auto url = juce::URL ("http://127.0.0.1:8000/parameters/" + juce::String (index)).withPOSTData (body);
+
+        auto inputStream = url.createInputStream (
+            juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                .withExtraHeaders ("Content-Type: application/json")
+                .withConnectionTimeoutMs (1500)
+                .withNumRedirectsToFollow (0)
+                .withHttpRequestCmd ("PUT"));
         
+        juce::String statusMessage;
+
         if (inputStream == nullptr)
         {
-            statusLabel.setText ("Server unavailable", juce::NotificationType::dontSendNotification);
-            return;
+            statusMessage= "Server unavailable";
         }
 
-        auto response = inputStream->readEntireStreamAsString();
-        auto parsed = juce::JSON::parse (response);
-
-        if (! parsed.isObject())
+        else
         {
-            statusLabel.setText ("Invalid response", juce::NotificationType::dontSendNotification);
-            return;
+            auto response = inputStream->readEntireStreamAsString();
+            auto parsed = juce::JSON::parse (response);
+
+            statusMessage = parsed.isObject()
+                                ? "Parameter " + juce::String (index + 1) + " set to " + juce::String (value)
+                                : "Invalid response";
         }
 
-        auto* object = parsed.getDynamicObject();
-        const auto value = static_cast<int> (object->getProperty ("value"));
-        paramSliders[(size_t) i].setValue (value, juce::NotificationType::dontSendNotification);
-    }
-
-    statusLabel.setText ("Connected", juce::NotificationType::dontSendNotification);
+        juce::MessageManager::callAsync ([this, statusMessage]
+        {
+            statusLabel.setText (statusMessage, juce::NotificationType::dontSendNotification);
+        });
+    });
 }
