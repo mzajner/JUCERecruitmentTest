@@ -191,3 +191,73 @@ void MainComponent::resized()
     parameterNameLabel.setBounds (valueArea.removeFromTop (70));
     parameterValueLabel.setBounds (valueArea);
 }
+
+
+void MainComponent::loadRemoteParameters()
+{
+    statusLabel.setText ("Loading...", juce::dontSendNotification);
+
+    const juce::Component::SafePointer<MainComponent> safeThis (this);
+
+    juce::Thread::launch ([safeThis]
+    {
+        std::array<int, parameterCount> values {};
+        auto ok = true;
+
+        for (int i = 0; i < parameterCount; ++i)
+            ok = getRemoteParameter (i, values[static_cast<size_t> (i)]) && ok;
+
+        juce::MessageManager::callAsync ([safeThis, values, ok]
+        {
+            if (safeThis == nullptr)
+                return;
+
+            if (ok)
+            {
+                safeThis->parameterValues = values;
+                safeThis->updateDisplayedParameter();
+                safeThis->statusLabel.setText ("Loaded", juce::dontSendNotification);
+            }
+            else
+            {
+                safeThis->statusLabel.setText ("Server unavailable", juce::dontSendNotification);
+            }
+        });
+    });
+}
+
+void MainComponent::sendParameterValue (int index, int value)
+{
+    statusLabel.setText ("Updating...", juce::dontSendNotification);
+
+    const juce::Component::SafePointer<MainComponent> safeThis (this);
+
+    juce::Thread::launch ([safeThis, index, value]
+    {
+        const auto ok = putRemoteParameter (index, value);
+
+        juce::MessageManager::callAsync ([safeThis, index, ok]
+        {
+            if (safeThis != nullptr)
+                safeThis->statusLabel.setText (ok ? "Updated Parameter " + juce::String (index + 1)
+                                                  : "Server unavailable",
+                                               juce::dontSendNotification);
+        });
+    });
+}
+
+void MainComponent::updateDisplayedParameter()
+{
+    const auto value = parameterValues[static_cast<size_t> (selectedParameter)];
+
+    parameterNameLabel.setText ("Parameter " + juce::String (selectedParameter + 1) + ":",
+                                juce::dontSendNotification);
+    parameterNameLabel.setFont (juce::FontOptions (40.0f));
+
+    parameterValueLabel.setText (juce::String (value), juce::dontSendNotification);
+    parameterValueLabel.setFont (juce::FontOptions (96.0f));
+
+    suppressSliderCallback = true;
+    parameterSlider.setValue (value, juce::dontSendNotification);
+    suppressSliderCallback = false;
+}
