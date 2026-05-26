@@ -100,13 +100,66 @@ private:
     juce::Image knobImage;
 };
 
+
 MainComponent::MainComponent()
 {
     knobLookAndFeel = std::make_unique<FilmstripKnobLookAndFeel>();
 
-    for (int i = 0; i <parameterCount; ++i)
-    setSize (600, 400);
+    for (int i = 0; i < parameterCount; ++i)
+    {
+        auto& button = parameterButtons[static_cast<size_t> (i)];
+        button.setButtonText ("Parameter " + juce::String (i + 1));
+        button.setClickingTogglesState (true);
+        button.setRadioGroupId (buttonGroupId);
+        button.onClick = [this, i] { selectParameter (i); };
+        addAndMakeVisible (button);
+    }
+
+    parameterButtons[0].setToggleState (true, juce::dontSendNotification);
+
+    parameterSlider.setRange (minParameterValue, maxParameterValue, 1.0);
+    parameterSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    parameterSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    parameterSlider.setLookAndFeel (knobLookAndFeel.get());
+    parameterSlider.onValueChange = [this]
+    {
+        if (suppressSliderCallback)
+            return;
+
+        parameterValues[static_cast<size_t> (selectedParameter)] =
+            static_cast<int> (std::round (parameterSlider.getValue()));
+        updateDisplayedParameter();
+    };
+    parameterSlider.onDragEnd = [this]
+    {
+        const auto value = static_cast<int> (std::round (parameterSlider.getValue()));
+        parameterValues[static_cast<size_t> (selectedParameter)] = value;
+        sendParameterValue (selectedParameter, value);
+    };
+    addAndMakeVisible (parameterSlider);
+
+    parameterNameLabel.setJustificationType (juce::Justification::centredLeft);
+    parameterNameLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    addAndMakeVisible (parameterNameLabel);
+
+    parameterValueLabel.setJustificationType (juce::Justification::centred);
+    parameterValueLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    addAndMakeVisible (parameterValueLabel);
+
+    statusLabel.setJustificationType (juce::Justification::centred);
+    statusLabel.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+    addAndMakeVisible (statusLabel);
+
+    setSize (640, 480);
+    updateDisplayedParameter();
+    loadRemoteParameters();
 }
+
+MainComponent::~MainComponent()
+{
+    parameterSlider.setLookAndFeel (nullptr);
+}
+
 
 //==============================================================================
 void MainComponent::paint (juce::Graphics& g)
