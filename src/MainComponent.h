@@ -9,6 +9,7 @@ class MainComponent final : public juce::Component
 {
 public:
     MainComponent();
+    ~MainComponent() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -22,7 +23,6 @@ private:
     void loadRemoteParameters();
     void sendParameterValue (int index, int value);
     void updateDisplayParameter();
-    void setStatusText (const juce::String& text);
 
     std::array<juce::TextButton, 4> parameterButtons;
     juce::Slider parameterSlider;
@@ -37,9 +37,7 @@ private:
     std::array<bool, 4> pendingWrites {};
 
     int selectedParameter = 0;
-    bool isDraggingSlider = false;
     bool suppressSliderCallback = false;
-    std::atomic<bool> isLoadingParameters { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
