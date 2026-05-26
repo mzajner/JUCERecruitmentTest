@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <atomic>
 #include <memory>
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -14,15 +13,13 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-
 private:
-
     class FilmstripKnobLookAndFeel;
 
     void selectParameter (int index);
     void loadRemoteParameters();
     void sendParameterValue (int index, int value);
-    void updateDisplayParameter();
+    void updateDisplayedParameter();
 
     std::array<juce::TextButton, 4> parameterButtons;
     juce::Slider parameterSlider;
@@ -33,8 +30,6 @@ private:
     std::unique_ptr<FilmstripKnobLookAndFeel> knobLookAndFeel;
 
     std::array<int, 4> parameterValues {};
-    std::array<int, 4> parameterRevisions {};
-    std::array<bool, 4> pendingWrites {};
 
     int selectedParameter = 0;
     bool suppressSliderCallback = false;
