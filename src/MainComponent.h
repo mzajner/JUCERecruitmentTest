@@ -4,17 +4,20 @@
 #include "BinaryData.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 
-class MainComponent final : public juce::Component
+class MainComponent final : public juce::Component,
+                            private juce::Timer
 {
 public:
     MainComponent();
-
+    ~MainComponent() override;
     void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
     class FilmstripKnobLookAndFeel;
     
+    void timerCallback() override;
+
     std::array<juce::Slider, 4> paramSliders;
     std::array<juce::Label, 4> paramLabels;
 

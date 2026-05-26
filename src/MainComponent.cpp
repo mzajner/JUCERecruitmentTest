@@ -50,6 +50,7 @@ private:
 MainComponent::MainComponent()
 {
     setSize (600, 400);
+    startTimer (2000);
 
     knobLookAndFeel = std::make_unique<FilmstripKnobLookAndFeel>();
 
@@ -67,6 +68,14 @@ MainComponent::MainComponent()
         slider.setLookAndFeel (knobLookAndFeel.get());
         addAndMakeVisible (slider);
     }
+}
+
+MainComponent::~MainComponent()
+{
+    stopTimer();
+
+    for (auto& slider : paramSliders)
+        slider.setLookAndFeel (nullptr);
 }
 
 //==============================================================================
@@ -90,4 +99,36 @@ void MainComponent::resized()
     }
 
     statusLabel.setBounds (statusArea);
+}
+
+void MainComponent::timerCallback()
+{
+    for (int i = 0; i < static_cast<int> (paramSliders.size()); ++i)
+    {
+        auto url = juce::URL ("http://127.0.0.1:8000/parameters/" + juce::String (i));
+
+        auto inputStream = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                                .withConnectionTimeoutMs (1500));
+        
+        if (inputStream == nullptr)
+        {
+            statusLabel.setText ("Server unavailable", juce::NotificationType::dontSendNotification);
+            return;
+        }
+
+        auto response = inputStream->readEntireStreamAsString();
+        auto parsed = juce::JSON::parse (response);
+
+        if (! parsed.isObject())
+        {
+            statusLabel.setText ("Invalid response", juce::NotificationType::dontSendNotification);
+            return;
+        }
+
+        auto* object = parsed.getDynamicObject();
+        const auto value = static_cast<int> (object->getProperty ("value"));
+        paramSliders[(size_t) i].setValue (value, juce::NotificationType::dontSendNotification);
+    }
+
+    statusLabel.setText ("Connected", juce::NotificationType::dontSendNotification);
 }
