@@ -15,6 +15,9 @@ juce::String parameterUrl (int index)
     return "http://localhost:8000/parameters/" + juce::String (index);
 }
 
+// Read JSON response like {"value": 42} and extract the value, returning true on success
+// Parses server response, reads value and clamps it to assigned range
+// Production app would be more robust: validate the index, response type, status code, ettor body, etc.
 bool readParameterValue (const juce::String& response, int& value)
 {
     auto parsed = juce::JSON::parse (response);
@@ -29,6 +32,8 @@ bool readParameterValue (const juce::String& response, int& value)
     return false;
 }
 
+// GET helper
+// performs GET request, patses the response to integer value, returns
 bool getRemoteParameter (int index, int& value)
 {
     auto stream = juce::URL (parameterUrl (index)).createInputStream (
@@ -37,6 +42,11 @@ bool getRemoteParameter (int index, int& value)
 
     return stream != nullptr && readParameterValue (stream->readEntireStreamAsString(), value);
 }
+
+// PUT helper
+// Builds a JSON body  {"value": 42}
+// Sends the request with 'Content-Type: application/json'
+// Times out so the app doesn't wait forever. 
 
 bool putRemoteParameter (int index, int value)
 {
@@ -57,6 +67,10 @@ bool putRemoteParameter (int index, int value)
 }
 }
 
+// LAF
+// Load image from compiled memory
+// maps slider to a filmstip frame (129 frames, 0-128), then draws slices.
+// Move down frame by 'frame*framesize' to get the correct slice for the slider position.
 class MainComponent::FilmstripKnobLookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
@@ -104,6 +118,13 @@ public:
 private:
     juce::Image knobImage;
 };
+
+// Constructor
+// create LAF (unique ptr because LookAndFeel is non-copyable and needs to be heap allocated)
+// Create four buttons in loop, strap a radiogroup to them
+// Set up slider, attach LAF. Callback updates the local value [lambda]
+// Drag-end sends the value to the server once dragging stops (don't overload with PUT requests while dragging)
+// Label displays paramer N
 
 MainComponent::MainComponent()
 {
@@ -159,6 +180,8 @@ MainComponent::MainComponent()
     loadRemoteParameters();
 }
 
+// Destructor
+// slider has a raw point to LAF, so clear it before knobLookAndFeel is destroyed will avoid hangin pointer.
 MainComponent::~MainComponent()
 {
     parameterSlider.setLookAndFeel (nullptr);
@@ -169,6 +192,8 @@ void MainComponent::paint (juce::Graphics& g)
     g.fillAll (juce::Colour::fromRGB (47, 62, 67));
 }
 
+// Layout
+// Rop row 4 buttons, bottom status row, left corner rotary knob, right section parameter name and value
 void MainComponent::resized()
 {
     auto area = getLocalBounds().reduced (36);
@@ -188,12 +213,20 @@ void MainComponent::resized()
     parameterValueLabel.setBounds (valueArea);
 }
 
+// the button only changes which stored value is shown, updateDisplayParameter refreshes knob, name and value labels...
 void MainComponent::selectParameter (int index)
 {
     selectedParameter = index;
     updateDisplayedParameter();
 }
 
+// Load parameters from the server on a background thread
+// Update the UI when they are loaded, or show an error if the server is unavailable
+// Uses juce::Component::SafePointer to aboid accessing  Maincomponent after it's deleted, 
+// and juce::MessageManager::callAsync to post the update back to the message thread.
+// Production app would be more robust: handle exceptions, validate server response, etc. 
+// juce components should update on the message thread.
+//  Then returns to UI thread (callAsync)
 void MainComponent::loadRemoteParameters()
 {
     statusLabel.setText ("Loading...", juce::dontSendNotification);
@@ -227,6 +260,9 @@ void MainComponent::loadRemoteParameters()
     });
 }
 
+// send parameter value to server on backgroundthread. 
+// Starts when user finishes dragging the slider. 
+// Launches a background PUT request, and updates stauts label. 
 void MainComponent::sendParameterValue (int index, int value)
 {
     statusLabel.setText ("Updating...", juce::dontSendNotification);
@@ -247,6 +283,7 @@ void MainComponent::sendParameterValue (int index, int value)
     });
 }
 
+// Update the display (reads selected values/parameters), updates the components
 void MainComponent::updateDisplayedParameter()
 {
     const auto value = parameterValues[static_cast<size_t> (selectedParameter)];
