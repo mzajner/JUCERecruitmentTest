@@ -3,3 +3,6 @@ build/
 compile_commands.json
 .jumake
 __pycache__/
+CODEX_GAMEPLAN.md
+INTERVIEW_PREP.md
+REST_PARAMETER_SYNC_TEST.md
