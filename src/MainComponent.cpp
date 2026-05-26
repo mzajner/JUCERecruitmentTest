@@ -50,6 +50,56 @@ namespace
                 .withHttpRequestCmd ("PUT"));
     }
 }
+
+
+class MainComponent::FilmstripKnobLookAndFeel final : public juce::LookAndFeel_V4
+{
+public:
+    FilmstripKnobLookAndFeel()
+        : knobImage (juce::ImageFileFormat::loadFrom (AmpMiddleKnob_png,
+                                                      AmpMiddleKnob_pngSize))
+    {
+    }
+
+    void drawRotarySlider (juce::Graphics& g,
+                           int x,
+                           int y,
+                           int width,
+                           int height,
+                           float sliderPosProportional,
+                           float,
+                           float,
+                           juce::Slider&) override
+    {
+        if (! knobImage.isValid())
+            return;
+
+        const auto frameSize = static_cast<int> (AmpMiddleKnob_width);
+        const auto frameCount = static_cast<int> (AmpMiddleKnob_nPictures);
+        const auto frame = juce::jlimit (0,
+                                         frameCount - 1,
+                                         static_cast<int> (std::round (sliderPosProportional
+                                                                      * static_cast<float> (frameCount - 1))));
+        const auto size = juce::jmin (width, height);
+        const auto destX = x + (width - size) / 2;
+        const auto destY = y + (height - size) / 2;
+
+        g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+        g.drawImage (knobImage,
+                     destX,
+                     destY,
+                     size,
+                     size,
+                     0,
+                     frame * frameSize,
+                     frameSize,
+                     frameSize);
+    }
+
+private:
+    juce::Image knobImage;
+};
+
 MainComponent::MainComponent()
 {
     knobLookAndFeel = std::make_unique<FilmstripKnobLookAndFeel>();
