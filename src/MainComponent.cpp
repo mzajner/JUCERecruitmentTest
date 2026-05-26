@@ -164,13 +164,30 @@ MainComponent::~MainComponent()
 //==============================================================================
 void MainComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    g.fillAll (juce::Colours::darkgrey);
+}
 
-    g.setFont (juce::FontOptions (16.0f));
-    g.setColour (juce::Colours::white);
-    g.drawText ("Hello World!", getLocalBounds(), juce::Justification::centred, true);
+voidvoid MainComponent::selectParameter (int index)
+{
+    selectedParameter = index;
+    updateDisplayedParameter();
 }
 
 void MainComponent::resized()
 {
+        auto area = getLocalBounds().reduced (36);
+    auto buttonArea = area.removeFromTop (70);
+    const auto buttonWidth = buttonArea.getWidth() / parameterCount;
+
+    for (auto& button : parameterButtons)
+        button.setBounds (buttonArea.removeFromLeft (buttonWidth).reduced (6));
+    
+    statusLabel.setBounds (area.removeFromBottom (30));
+
+    auto knobArea = area.removeFromLeft (area.getWidth() / 2).reduced (24);
+    parameterSlider.setBounds (knobArea);   
+
+    auto valueArea = area.reduced (24);
+    parameterNameLabel.setBounds (valueArea.removeFromTop (70));
+    parameterValueLabel.setBounds (valueArea);
 }
