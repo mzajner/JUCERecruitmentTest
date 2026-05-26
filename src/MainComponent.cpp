@@ -1,56 +1,61 @@
 #include "MainComponent.h"
+
 #include "BinaryData.h"
 
 namespace
 {
-    constexpr int parameterCount = 4;
-    constexpr auto minParameterValue = 0;
-    constexpr auto maxParameterValue = 100;
-    constexpr auto requestTimeoutMs = 1500;
-    constexpr auto buttonGroupId = 1001;
+constexpr auto parameterCount = 4;
+constexpr auto minParameterValue = 0;
+constexpr auto maxParameterValue = 100;
+constexpr auto requestTimeoutMs = 1500;
+constexpr auto buttonGroupId = 1001;
 
-
-    juce::String parameterUrl (int index)
-    {
-        return "http://localhost:8080/parameter/" + juce::String (index);
-    }
-
-    bool readParameterValue (const juce::String& response, int& value)
-    {
-        auto parsed = juce::JSON::parse (response);
-
-        if (auto* object = parsed.getDynamicObject())
-        {
-            value = static_cast<int> (object->getProperty ("value"));
-            value = juce::jlimit (minParameterValue, maxParameterValue, value);
-            return true;
-        }
-
-        return false
-    }
-
-    bool getRemoteParameter (int index, int& value)
-    {
-        auto stream = juce::URL (parameterUrl (index)).createInputStream (
-            juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                .withConnectionTimeoutMs (requestTimeoutMs));
-        
-        return stream != nullptr && readParameterValue (stream-> readEntireStreamAsString(), value);
-    }
-
-    bool putRemoteParameter (int index, int value)
-    {
-        const auto body = "{\"value\":" + juce::String (value) + "}";
-        auto stream = juce::URL (parameterUrl (index))
-            .withPOSTData (body)
-            .createInputStream (
-                juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                .withExtraHeaders ("Content-Type: application/json")
-                .withConnectionTimeoutMs (requestTimeoutMs)
-                .withHttpRequestCmd ("PUT"));
-    }
+juce::String parameterUrl (int index)
+{
+    return "http://localhost:8000/parameters/" + juce::String (index);
 }
 
+bool readParameterValue (const juce::String& response, int& value)
+{
+    auto parsed = juce::JSON::parse (response);
+
+    if (auto* object = parsed.getDynamicObject())
+    {
+        value = static_cast<int> (object->getProperty ("value"));
+        value = juce::jlimit (minParameterValue, maxParameterValue, value);
+        return true;
+    }
+
+    return false;
+}
+
+bool getRemoteParameter (int index, int& value)
+{
+    auto stream = juce::URL (parameterUrl (index)).createInputStream (
+        juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+            .withConnectionTimeoutMs (requestTimeoutMs));
+
+    return stream != nullptr && readParameterValue (stream->readEntireStreamAsString(), value);
+}
+
+bool putRemoteParameter (int index, int value)
+{
+    const auto body = "{\"value\":" + juce::String (juce::jlimit (minParameterValue,
+                                                                  maxParameterValue,
+                                                                  value))
+                      + "}";
+
+    auto stream = juce::URL (parameterUrl (index))
+                      .withPOSTData (body)
+                      .createInputStream (
+                          juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                              .withExtraHeaders ("Content-Type: application/json")
+                              .withConnectionTimeoutMs (requestTimeoutMs)
+                              .withHttpRequestCmd ("PUT"));
+
+    return stream != nullptr;
+}
+}
 
 class MainComponent::FilmstripKnobLookAndFeel final : public juce::LookAndFeel_V4
 {
@@ -99,7 +104,6 @@ public:
 private:
     juce::Image knobImage;
 };
-
 
 MainComponent::MainComponent()
 {
@@ -160,38 +164,35 @@ MainComponent::~MainComponent()
     parameterSlider.setLookAndFeel (nullptr);
 }
 
-
-//==============================================================================
 void MainComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colours::darkgrey);
-}
-
-voidvoid MainComponent::selectParameter (int index)
-{
-    selectedParameter = index;
-    updateDisplayedParameter();
+    g.fillAll (juce::Colour::fromRGB (47, 62, 67));
 }
 
 void MainComponent::resized()
 {
-        auto area = getLocalBounds().reduced (36);
+    auto area = getLocalBounds().reduced (36);
     auto buttonArea = area.removeFromTop (70);
     const auto buttonWidth = buttonArea.getWidth() / parameterCount;
 
     for (auto& button : parameterButtons)
         button.setBounds (buttonArea.removeFromLeft (buttonWidth).reduced (6));
-    
-    statusLabel.setBounds (area.removeFromBottom (30));
+
+    statusLabel.setBounds (area.removeFromBottom (26));
 
     auto knobArea = area.removeFromLeft (area.getWidth() / 2).reduced (24);
-    parameterSlider.setBounds (knobArea);   
+    parameterSlider.setBounds (knobArea);
 
     auto valueArea = area.reduced (24);
     parameterNameLabel.setBounds (valueArea.removeFromTop (70));
     parameterValueLabel.setBounds (valueArea);
 }
 
+void MainComponent::selectParameter (int index)
+{
+    selectedParameter = index;
+    updateDisplayedParameter();
+}
 
 void MainComponent::loadRemoteParameters()
 {
